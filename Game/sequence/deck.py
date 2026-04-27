@@ -4,7 +4,7 @@ SUITS = ['S', 'H', 'D', 'C']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 
 def build_deck():
-    deck = [f"{rank}{suit}" for suit in SUITS for rank in RNAKS] * 2
+    deck = [f"{rank}{suit}" for suit in SUITS for rank in RANKS] * 2
     random.shuffle(deck)
     return deck
 
