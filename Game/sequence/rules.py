@@ -1,4 +1,4 @@
-from board import BOARD_LAYOUT, CARD_POSITIONS
+from .board import BOARD_LAYOUT, CARD_POSITIONS
 
 TWO_EYED_JACKS = {'JH', 'JD'}
 ONE_EYED_JACKS = {'JS', 'JC'}

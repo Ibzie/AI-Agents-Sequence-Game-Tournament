@@ -36,7 +36,7 @@ def init_game(player_ids, chips):
     player_ids: list of player id strings e.g. ['player1', 'player2']
     chips: dict of player_id -> chip color e.g. {'player1': 'blue', 'player2': 'green'}
     """
-    from deck import build_deck, deal
+    from .deck import build_deck, deal
 
     deck = build_deck()
     hands_list, deck = deal(deck, num_players=len(player_ids))

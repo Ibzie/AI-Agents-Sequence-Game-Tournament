@@ -1,4 +1,4 @@
-from deck import draw_card
+from .deck import draw_card
 
 def play_card(hand, discard_pile, card, board, position, player_chip):
     hand.remove(card)
