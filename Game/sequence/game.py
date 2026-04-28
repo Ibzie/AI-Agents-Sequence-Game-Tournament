@@ -1,8 +1,8 @@
 import copy
-from rules import get_legal_moves
-from player_actions import play_card, play_two_eyed_jack, play_one_eyed_jack, discard_dead_card
-from sequence_detector import count_sequences, get_locked_positions
-from deck import draw_card
+from .rules import get_legal_moves
+from .player_actions import play_card, play_two_eyed_jack, play_one_eyed_jack, discard_dead_card
+from .sequence_detector import count_sequences, get_locked_positions
+from .deck import draw_card
 
 SEQUENCES_TO_WIN = 2
 
