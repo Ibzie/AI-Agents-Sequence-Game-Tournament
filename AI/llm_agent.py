@@ -19,7 +19,7 @@ class LLMAgent(BaseAgent):
         self,
         provider: BaseProvider,
         model: str,
-        temperature: float = 0.7,
+        temperature: float = 0.3,
         max_tokens: int = 512,
         player_id: str = "ai",
     ):

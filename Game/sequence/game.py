@@ -63,6 +63,7 @@ def apply_move(state, move):
         idx = state.players.index(player)
         state.current_player = state.players[(idx + 1) % len(state.players)]
 
+    state.move_history.append((player, move))
     state.turn_number += 1
     return state
 

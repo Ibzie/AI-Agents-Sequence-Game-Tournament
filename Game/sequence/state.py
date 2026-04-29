@@ -15,6 +15,7 @@ class GameState:
     locked_positions: set            # positions locked by completed sequences
     turn_number: int = 0
     winner: Optional[str] = None
+    move_history: list = field(default_factory=list)  # [(player_id, move_dict), ...]
 
     def to_json(self):
         return json.dumps({
