@@ -23,6 +23,7 @@ class LLMAgent(BaseAgent):
         max_tokens: int = 1024,
         player_id: str = "ai",
     ):
+        super().__init__()
         self.provider = provider
         self.model = model
         self.temperature = temperature
@@ -48,6 +49,11 @@ class LLMAgent(BaseAgent):
                 continue
 
             logger.info(f"[{self.player_id}] LLM response: {raw_response[:300]}")
+            self.last_response = raw_response
+
+            thinking = getattr(self.provider, 'last_thinking', None)
+            if thinking:
+                self.last_response = f"<thinking>\n{thinking}\n</thinking>\n{raw_response}"
 
             move = parse_move_index(raw_response, legal_moves)
             if move is not None:
@@ -65,4 +71,5 @@ class LLMAgent(BaseAgent):
             )
 
         logger.warning(f"[{self.player_id}] All retries exhausted. Falling back to random move.")
+        self.last_response = "(random fallback)"
         return random_agent(legal_moves)

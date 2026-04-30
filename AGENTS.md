@@ -70,7 +70,8 @@ No test suite, linter, formatter, typechecker, or CI exists yet.
 - **State is immutable**: `apply_move` (`game.py`) deep-copies `GameState` before mutating. Never mutate state in-place.
 - **Legal moves are plain dicts** with keys `type` (`place`, `two_eyed_jack`, `one_eyed_jack`, `dead_card`), `card`, and `position` (tuple or None).
 - **LLM response format**: `{"move_index": <int>}` for normal moves, `{"move_index": <int>, "position": [row, col]}` for wild jack placements on unlisted positions. Parser (`AI/parser.py`) uses cascading fallback: strict JSON → regex JSON extraction → regex position extraction → bare number extraction.
-- **LLM agent** (`AI/llm_agent.py`) retries up to 3 times on parse failure, then falls back to random move. Default temperature 0.3.
+- **LLM agent** (`AI/llm_agent.py`) retries up to 3 times on parse failure, then falls back to random move. Default temperature 0.3. Stores the raw LLM response in `agent.last_response` after each call, which the game runner includes in move events for the visualizer.
+- **LLM reasoning in visualizer**: each move event may include an `llm_response` field. The move log renders a toggle button to expand/collapse the agent's reasoning.
 - **Prompt builder** (`AI/prompt.py`) filters two-eyed jack moves to ~15 strategic targets instead of listing all ~80 empty positions. The game engine still generates all positions for validation.
 - **Strategic analysis** (`analysis.py`) uses sliding-window for completing positions and a separate run-based method for partial sequences. Both treat corner positions (XX) as wild.
 - **Provider abstraction** (`AI/providers/base.py`): add new providers by subclassing `BaseProvider` and registering in `AI/providers/__init__.py`.

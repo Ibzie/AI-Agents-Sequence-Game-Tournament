@@ -6,3 +6,6 @@ class BaseAgent(ABC):
     @abstractmethod
     def choose_move(self, state: GameState, legal_moves: list) -> dict:
         raise NotImplementedError
+
+    def __init__(self):
+        self.last_response = None

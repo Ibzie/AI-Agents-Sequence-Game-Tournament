@@ -77,6 +77,8 @@ class ConnectionManager:
 manager = ConnectionManager()
 live_game_id: Optional[str] = None
 live_events: list[dict] = []
+active_game_thread: Optional[threading.Thread] = None
+cancel_game = threading.Event()
 
 
 class NewGameRequest(BaseModel):
@@ -107,9 +109,24 @@ async def get_game(game_id: str):
         return {"error": f"Game {game_id} not found"}, 404
 
 
+@app.delete("/api/games/active")
+async def stop_active_game():
+    global cancel_game
+    cancel_game.set()
+    payload = json.dumps({"type": "game_cancelled", "game_id": live_game_id or ""})
+    await manager.broadcast(payload)
+    return {"status": "stopping"}
+
+
 @app.post("/api/games")
 async def start_game(req: NewGameRequest):
-    global live_game_id, live_events
+    global live_game_id, live_events, active_game_thread, cancel_game
+
+    cancel_game.set()
+    if active_game_thread and active_game_thread.is_alive():
+        active_game_thread.join(timeout=5)
+
+    cancel_game = threading.Event()
 
     config = GameConfig(
         p1_provider=req.p1_provider,
@@ -136,6 +153,8 @@ async def start_game(req: NewGameRequest):
 
     def on_event(event_dict: dict):
         live_events.append(event_dict)
+        if cancel_game.is_set():
+            return
         payload = json.dumps({"type": "game_event", "game_id": game_log.game_id, "event": event_dict})
         manager.broadcast_from_thread(payload)
         if config.delay_ms > 0:
@@ -145,16 +164,20 @@ async def start_game(req: NewGameRequest):
     def run():
         nonlocal game_log_for_save
         try:
-            from AI.game_runner import _run_sync
-            game_log_for_save = _run_sync(config, on_event)
+            from AI.game_runner import _run_sync_with_cancel
+            game_log_for_save = _run_sync_with_cancel(config, on_event, cancel_game)
             game_log_for_save.game_id = game_log.game_id
-            result_queue.put(("done", game_log_for_save))
+            if cancel_game.is_set():
+                result_queue.put(("cancelled", game_log_for_save))
+            else:
+                result_queue.put(("done", game_log_for_save))
         except Exception as e:
             logger.exception(f"Game thread error: {e}")
             result_queue.put(("error", str(e)))
 
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
+    active_game_thread = thread
 
     async def wait_for_game():
         while result_queue.empty():
@@ -168,6 +191,10 @@ async def start_game(req: NewGameRequest):
                 await manager.broadcast(payload)
             except Exception as e:
                 logger.error(f"Failed to save game log: {e}")
+        elif result[0] == "cancelled":
+            gl = result[1]
+            payload = json.dumps({"type": "game_cancelled", "game_id": gl.game_id})
+            await manager.broadcast(payload)
         else:
             payload = json.dumps({"type": "game_error", "error": result[1]})
             await manager.broadcast(payload)

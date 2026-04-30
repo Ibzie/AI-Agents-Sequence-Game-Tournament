@@ -77,8 +77,8 @@
       'panel-p1', 'panel-p2',
       'turn-indicator', 'turn-player', 'turn-text',
       'log-entries', 'log-status',
-      'btn-new-game', 'btn-past-games',
-      'modal-overlay', 'modal-close', 'modal-cancel', 'modal-start',
+'btn-new-game', 'btn-past-games', 'btn-stop-game',
+       'modal-overlay', 'modal-close', 'modal-cancel', 'modal-start',
       'modal-past-close', 'modal-past-cancel',
       'p1-provider', 'p1-model-input', 'p2-provider', 'p2-model-input',
       'delay-ms', 'ollama-host',
@@ -146,7 +146,6 @@
   }
 
 function updateBoard() {
-    const prevBoard = {};
     for (let r = 0; r < 10; r++) {
       for (let c = 0; c < 10; c++) {
         const cell = document.getElementById(`cell-${r}-${c}`);
@@ -164,39 +163,9 @@ function updateBoard() {
             chip.dataset.color = chipValue;
             chip.textContent = shortName;
             cell.appendChild(chip);
-            if (!existingChip) {
-              anime({
-                targets: chip,
-                scale: [0, 1],
-                opacity: [0, 1],
-                duration: 300,
-                easing: 'easeOutBack',
-              });
-            }
           }
         } else {
-          if (existingChip) {
-            existingChip.remove();
-          }
-        }
-
-        const isLastMove = state.lastMove && state.lastMove.position &&
-          state.lastMove.position[0] === r && state.lastMove.position[1] === c;
-        cell.classList.toggle('last-move', isLastMove);
-      }
-    }
-  }
-        } else {
-          if (existingChip) {
-            anime({
-              targets: existingChip,
-              scale: [1, 0],
-              opacity: [1, 0],
-              duration: 200,
-              easing: 'easeInQuad',
-              complete: () => existingChip.remove(),
-            });
-          }
+          if (existingChip) existingChip.remove();
         }
 
         const seqKey = `${r},${c}`;
@@ -229,14 +198,6 @@ function updateBoard() {
       const seqEl = els[`${prefix}_sequences`];
       const newCount = state.sequences[player.id] || 0;
       if (parseInt(seqEl.textContent) !== newCount) {
-        if (newCount > parseInt(seqEl.textContent || '0')) {
-          anime({
-            targets: seqEl,
-            scale: [1.5, 1],
-            duration: 400,
-            easing: 'easeOutElastic(1, .5)',
-          });
-        }
         seqEl.textContent = newCount;
       }
 
@@ -265,11 +226,6 @@ function updateBoard() {
     container.innerHTML = '';
     for (const card of hand) {
       const cardEl = createHandCard(card);
-      const isLastPlayed = state.lastPlayedCard && state.lastPlayedCard === card && state.lastMovePlayer === playerId;
-      if (isLastPlayed) {
-        cardEl.classList.add('just-played');
-        setTimeout(() => cardEl.classList.remove('just-played'), 600);
-      }
       container.appendChild(cardEl);
     }
   }
@@ -337,6 +293,24 @@ function updateBoard() {
     entry.innerHTML = text;
     container.appendChild(entry);
     container.scrollTop = container.scrollHeight;
+
+    const toggle = entry.querySelector('.reason-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        const targetId = toggle.dataset.target;
+        const content = document.getElementById(targetId);
+        if (content) {
+          content.classList.toggle('hidden');
+          toggle.innerHTML = content.classList.contains('hidden') ? '&#9654;' : '&#9660;';
+        }
+      });
+    }
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   function formatMove(move) {
@@ -361,6 +335,7 @@ function updateBoard() {
   function processEvent(event) {
     state.events.push(event);
 
+    try {
     switch (event.type) {
       case 'deal': {
         state.gameActive = true;
@@ -388,9 +363,14 @@ function updateBoard() {
         }
 
         const playerClass = getPlayerClass(event.player);
-        addLogEntry(
-          `<span class="log-turn">T${event.turn}</span> <span class="log-player ${playerClass}">${event.player}</span> <span class="log-action">${formatMove(event.move)}</span>`
-        );
+        const moveText = `<span class="log-turn">T${event.turn}</span> <span class="log-player ${playerClass}">${event.player}</span> <span class="log-action">${formatMove(event.move)}</span>`;
+
+        if (event.llm_response) {
+          const entryId = `reason-T${event.turn}-${event.player}`;
+          addLogEntry(`${moveText} <button class="reason-toggle" data-target="${entryId}">&#9654;</button><div id="${entryId}" class="reason-content hidden">${escapeHtml(event.llm_response)}</div>`, '');
+        } else {
+          addLogEntry(moveText, '');
+        }
 
         updateBoard();
         updatePanels();
@@ -405,6 +385,7 @@ function updateBoard() {
 
         updateBoard();
         updatePanels();
+        updateTurnIndicator();
         break;
       }
       case 'game_over': {
@@ -445,6 +426,9 @@ function updateBoard() {
         updatePanels();
         break;
       }
+    }
+    } catch (err) {
+      console.error('[Sequence] processEvent error:', err, event);
     }
   }
 
@@ -518,7 +502,37 @@ function updateBoard() {
     });
   }
 
-  // ---------- WebSocket ----------
+  // ---------- RESIZE ----------
+
+  function initResize() {
+    const handle = document.getElementById('resize-handle');
+    const logSection = document.getElementById('log-section');
+    if (!handle || !logSection) return;
+
+    let startY = 0;
+    let startHeight = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+      startY = e.clientY;
+      startHeight = logSection.offsetHeight;
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      e.preventDefault();
+    });
+
+    function onMouseMove(e) {
+      const delta = startY - e.clientY;
+      const newHeight = Math.max(80, Math.min(window.innerHeight * 0.7, startHeight + delta));
+      logSection.style.height = newHeight + 'px';
+    }
+
+    function onMouseUp() {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    }
+  }
+
+  // ---------- WEBSOCKET ----------
 
   function connectWS() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -532,8 +546,12 @@ function updateBoard() {
     };
 
     state.ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      handleWSMessage(msg);
+      try {
+        const msg = JSON.parse(event.data);
+        handleWSMessage(msg);
+      } catch (err) {
+        console.error('[Sequence] WS message error:', err);
+      }
     };
 
     state.ws.onclose = () => {
@@ -558,6 +576,13 @@ function updateBoard() {
         addLogEntry(`<span class="log-game-over">Game log saved (ID: ${msg.game_id})</span>`, 'log-game-over');
         break;
       }
+      case 'game_cancelled': {
+        state.gameActive = false;
+        addLogEntry('<span class="log-game-over" style="color:var(--red)">Game stopped</span>', 'log-game-over');
+        els.log_status.textContent = 'Game stopped';
+        els.log_status.style.color = 'var(--red)';
+        break;
+      }
       case 'game_error': {
         addLogEntry(`<span class="log-game-over" style="color:var(--red)">Error: ${msg.error}</span>`, 'log-game-over');
         break;
@@ -576,9 +601,25 @@ function updateBoard() {
     }
   }
 
+  // ---------- STOP GAME ----------
+
+  function stopActiveGame() {
+    if (state.gameId && state.gameActive) {
+      fetch('/api/games/active', { method: 'DELETE' })
+        .then(() => {
+          state.gameActive = false;
+          els.log_status.textContent = 'Game stopped';
+          els.log_status.style.color = 'var(--red)';
+        })
+        .catch(() => {});
+    }
+  }
+
   // ---------- NEW GAME ----------
 
   function startNewGame() {
+    stopActiveGame();
+
     const config = {
       p1_provider: els.p1_provider.value,
       p1_model: els.p1_model_input.value || 'llama3',
@@ -708,6 +749,8 @@ function updateBoard() {
 
     els.modal_start.addEventListener('click', startNewGame);
 
+    els.btn_stop_game.addEventListener('click', stopActiveGame);
+
     els.modal_past_close.addEventListener('click', () => {
       els.modal_overlay.classList.add('hidden');
     });
@@ -750,6 +793,7 @@ function updateBoard() {
     initElements();
     buildBoard();
     bindEvents();
+    initResize();
     connectWS();
   }
 

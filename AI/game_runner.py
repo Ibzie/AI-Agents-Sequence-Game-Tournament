@@ -40,7 +40,7 @@ def _create_agent(config_item: dict):
     )
 
 
-def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = None) -> GameLog:
+def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = None, cancel: Optional[threading.Event] = None) -> GameLog:
     p1_info = PlayerInfo(id=config.p1_id, model=config.p1_model, provider=config.p1_provider, chip="blue")
     p2_info = PlayerInfo(id=config.p2_id, model=config.p2_model, provider=config.p2_provider, chip="green")
 
@@ -81,6 +81,9 @@ def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = N
         callback(deal_event.to_dict())
 
     while not is_game_over(state) and state.turn_number < config.max_turns:
+        if cancel and cancel.is_set():
+            break
+
         current = state.current_player
         moves = get_moves_for_current_player(state)
 
@@ -102,6 +105,7 @@ def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = N
 
         agent = agent_map[current]
         move = agent.choose_move(state, moves)
+        llm_response = getattr(agent, 'last_response', None)
 
         move_serializable = {
             "type": move["type"],
@@ -115,6 +119,7 @@ def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = N
             type="move",
             move=move_serializable,
             hand_before=hand_before,
+            llm_response=llm_response,
             snapshot=_snapshot_state(state),
         )
         game_log.add_event(event)
@@ -153,6 +158,10 @@ def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = N
 
 def run_game_streaming(config: GameConfig, callback: Optional[Callable[[dict], None]] = None) -> GameLog:
     return _run_sync(config, callback)
+
+
+def _run_sync_with_cancel(config: GameConfig, callback: Optional[Callable[[dict], None]] = None, cancel: Optional[threading.Event] = None) -> GameLog:
+    return _run_sync(config, callback, cancel)
 
 
 def run_game_in_thread(config: GameConfig, result_queue: queue.Queue, callback: Optional[Callable[[dict], None]] = None):
