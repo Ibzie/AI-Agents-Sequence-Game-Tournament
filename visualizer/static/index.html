@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sequence Game Visualizer</title>
+  <link rel="stylesheet" href="/static/vendor/cards.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div class="header-left">
+        <h1 class="logo">Sequence</h1>
+        <span class="subtitle">AI Tournament</span>
+      </div>
+      <div class="header-center">
+        <div id="turn-indicator" class="turn-indicator hidden">
+          <span id="turn-player" class="turn-player"></span>
+          <span id="turn-text" class="turn-text">Turn 0</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button id="btn-new-game" class="btn btn-primary">New Game</button>
+        <button id="btn-past-games" class="btn btn-secondary">Past Games</button>
+      </div>
+    </header>
+
+    <main class="game-area">
+      <aside id="panel-p1" class="player-panel">
+        <div class="player-header">
+          <div class="player-color" id="p1-color"></div>
+          <div class="player-info">
+            <span class="player-name" id="p1-name">Player 1</span>
+            <span class="player-model" id="p1-model">--</span>
+          </div>
+          <div class="player-sequences">
+            <span class="seq-label">Sequences</span>
+            <span class="seq-count" id="p1-sequences">0</span>
+            <span class="seq-goal">/ 2</span>
+          </div>
+        </div>
+        <div class="hand-label">Hand</div>
+        <div class="hand-container" id="p1-hand">
+          <div class="hand-placeholder">Waiting for game...</div>
+        </div>
+      </aside>
+
+      <section class="board-section">
+        <div class="board-wrapper">
+          <div class="col-labels" id="col-labels"></div>
+          <div class="board-with-rows">
+            <div class="row-labels" id="row-labels"></div>
+            <div class="board" id="board"></div>
+          </div>
+        </div>
+      </section>
+
+      <aside id="panel-p2" class="player-panel">
+        <div class="player-header">
+          <div class="player-color" id="p2-color"></div>
+          <div class="player-info">
+            <span class="player-name" id="p2-name">Player 2</span>
+            <span class="player-model" id="p2-model">--</span>
+          </div>
+          <div class="player-sequences">
+            <span class="seq-label">Sequences</span>
+            <span class="seq-count" id="p2-sequences">0</span>
+            <span class="seq-goal">/ 2</span>
+          </div>
+        </div>
+        <div class="hand-label">Hand</div>
+        <div class="hand-container" id="p2-hand">
+          <div class="hand-placeholder">Waiting for game...</div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="log-section">
+      <div class="log-header">
+        <span class="log-title">Move Log</span>
+        <span id="log-status" class="log-status"></span>
+      </div>
+      <div class="log-entries" id="log-entries">
+        <div class="log-entry log-empty">No game running. Start a new game or load a past game.</div>
+      </div>
+    </footer>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+      <div class="modal" id="modal-new-game">
+        <div class="modal-header">
+          <h2>New Game</h2>
+          <button class="modal-close" id="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Player 1 Provider</label>
+            <select id="p1-provider">
+              <option value="ollama">Ollama</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Player 1 Model</label>
+            <input type="text" id="p1-model-input" value="llama3" placeholder="Model name">
+          </div>
+          <div class="form-divider"></div>
+          <div class="form-group">
+            <label>Player 2 Provider</label>
+            <select id="p2-provider">
+              <option value="ollama">Ollama</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Player 2 Model</label>
+            <input type="text" id="p2-model-input" value="llama3" placeholder="Model name">
+          </div>
+          <div class="form-divider"></div>
+          <div class="form-group">
+            <label>Turn Delay (ms)</label>
+            <input type="number" id="delay-ms" value="800" min="0" max="5000" step="100">
+          </div>
+          <div class="form-group">
+            <label>Ollama Host</label>
+            <input type="text" id="ollama-host" value="http://localhost:11434">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+          <button class="btn btn-primary" id="modal-start">Start Game</button>
+        </div>
+      </div>
+
+      <div class="modal modal-wide hidden" id="modal-past-games">
+        <div class="modal-header">
+          <h2>Past Games</h2>
+          <button class="modal-close" id="modal-past-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="past-games-list" class="past-games-list">
+            <div class="log-empty">Loading...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="modal-past-cancel">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/vendor/anime.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

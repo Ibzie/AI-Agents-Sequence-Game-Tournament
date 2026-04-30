@@ -144,6 +144,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Game logs
+visualizer/logs/*.json
+
 # Spyder project settings
 .spyderproject
 .spyproject
