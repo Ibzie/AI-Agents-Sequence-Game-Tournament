@@ -5,6 +5,7 @@
 Two-package Python project: AI agents play the board game "Sequence" against each other or a random CPU opponent.
 - `Game/sequence/` — game engine (state, rules, board, deck, sequence detection, strategic analysis)
 - `AI/` — LLM-backed agent with pluggable providers (Ollama, OpenAI, Anthropic)
+- `visualizer/` — FastAPI + vanilla JS webapp for live tournament viewing
 
 Requires Python >=3.11.
 
@@ -13,25 +14,53 @@ Requires Python >=3.11.
 ```bash
 pip install -e ".[dev]"
 
-# AI vs CPU (default: Ollama/llama3)
+# CLI — AI vs CPU (default: Ollama/llama3)
 python -m AI.run_game
 python -m AI.run_game --provider openai --model gpt-4o
 python -m AI.run_game --provider anthropic --model claude-sonnet-4-20250514
 python -m AI.run_game --verbose
 
-# AI vs AI mode (uses --p1-provider / --p2-provider flags)
+# CLI — AI vs AI mode
 python -m AI.run_game --p1-provider openai --p1-model gpt-4o --p2-provider anthropic --p2-model claude-sonnet-4-20250514
 
-# Smoke test the game engine (random vs random, 100 games)
-python Game/sequence/smoke_test.py   # must run from inside Game/sequence/
+# CLI — per-player temperature
+python -m AI.run_game --p1-temperature 0.7 --p2-temperature 0.2
+
+# CLI — cap game length / custom Ollama host
+python -m AI.run_game --max-turns 300 --ollama-host http://host:11434
 ```
 
-# Visualizer (live game viewer webapp)
-python visualizer/backend.py                      # starts on http://localhost:8000
-# Or with uvicorn directly:
-uvicorn visualizer.backend:app --host 0.0.0.0 --port 8000
+### Visualizer — Start a Tournament and Watch Live
 
-# Game logs are stored in visualizer/logs/ as JSON files
+```bash
+# Start the visualizer server
+python visualizer/backend.py                          # http://localhost:8000
+
+# Or with uvicorn directly
+uvicorn visualizer.backend:app --host 0.0.0.0 --port 8000
+```
+
+1. Open http://localhost:8000 → click **New Game**
+2. Pick provider + model for each player (Ollama, OpenAI, or Anthropic)
+3. Adjust turn delay → **Start Game**
+4. Board updates live as agents play
+5. Click **Past Games** to replay any saved match
+
+Game logs persist as JSON in `visualizer/logs/`.
+
+#### REST / WebSocket API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/games` | List saved games |
+| `GET` | `/api/games/{game_id}` | Load a game log |
+| `POST` | `/api/games` | Start new game (`p1_provider`, `p1_model`, `p2_provider`, `p2_model`, `delay_ms`, `ollama_host`) |
+| `WS` | `/ws/live` | Stream live game events |
+
+### Smoke Test
+
+```bash
+cd Game/sequence && python smoke_test.py   # 100 random vs random games
 ```
 
 No test suite, linter, formatter, typechecker, or CI exists yet.
