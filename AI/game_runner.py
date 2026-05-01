@@ -106,6 +106,7 @@ def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = N
         agent = agent_map[current]
         move = agent.choose_move(state, moves)
         llm_response = getattr(agent, 'last_response', None)
+        metrics = getattr(agent, 'last_metrics', None)
 
         move_serializable = {
             "type": move["type"],
@@ -121,6 +122,9 @@ def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = N
             hand_before=hand_before,
             llm_response=llm_response,
             snapshot=_snapshot_state(state),
+            move_duration_seconds=metrics.duration_seconds if metrics else None,
+            prompt_tokens=metrics.prompt_tokens if metrics else None,
+            completion_tokens=metrics.completion_tokens if metrics else None,
         )
         game_log.add_event(event)
         if callback:
@@ -153,6 +157,7 @@ def _run_sync(config: GameConfig, callback: Optional[Callable[[dict], None]] = N
     if callback:
         callback(end_event.to_dict())
 
+    game_log.compute_stats()
     return game_log
 
 

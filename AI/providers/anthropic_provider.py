@@ -1,5 +1,7 @@
 import os
-from .base import BaseProvider
+import time
+
+from .base import BaseProvider, CompletionResult
 
 
 class AnthropicProvider(BaseProvider):
@@ -16,7 +18,7 @@ class AnthropicProvider(BaseProvider):
         model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.7,
         max_tokens: int = 512,
-    ) -> str:
+    ) -> CompletionResult:
         import anthropic
 
         client = anthropic.Anthropic(api_key=self.api_key)
@@ -38,5 +40,17 @@ class AnthropicProvider(BaseProvider):
         if system_text:
             kwargs["system"] = system_text
 
+        start = time.perf_counter()
         response = client.messages.create(**kwargs)
-        return response.content[0].text
+        elapsed = time.perf_counter() - start
+
+        content = response.content[0].text
+        prompt_tokens = response.usage.input_tokens if response.usage else None
+        completion_tokens = response.usage.output_tokens if response.usage else None
+
+        return CompletionResult(
+            content=content,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_seconds=elapsed,
+        )

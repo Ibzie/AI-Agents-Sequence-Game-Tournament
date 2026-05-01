@@ -65,15 +65,18 @@
     replaySpeed: 800,
     replayTimer: null,
     gameActive: false,
+    playerStats: {},
   };
 
   const els = {};
 
   function initElements() {
-    const ids = [
+const ids = [
       'board', 'col-labels', 'row-labels',
       'p1-color', 'p2-color', 'p1-name', 'p2-name', 'p1-model', 'p2-model',
       'p1-sequences', 'p2-sequences', 'p1-hand', 'p2-hand',
+      'p1-moves', 'p2-moves', 'p1-avg-time', 'p2-avg-time',
+      'p1-tokens', 'p2-tokens', 'p1-avg-tokens', 'p2-avg-tokens',
       'panel-p1', 'panel-p2',
       'turn-indicator', 'turn-player', 'turn-text',
       'log-entries', 'log-status',
@@ -179,6 +182,32 @@ function updateBoard() {
           state.lastMove.position[0] === r && state.lastMove.position[1] === c;
         cell.classList.toggle('last-move', isLastMove);
       }
+    }
+  }
+
+  function formatKpi(event) {
+    const parts = [];
+    if (event.move_duration_seconds != null) {
+      parts.push(event.move_duration_seconds.toFixed(1) + 's');
+    }
+    if (event.prompt_tokens != null && event.completion_tokens != null) {
+      parts.push((event.prompt_tokens + event.completion_tokens) + 'tok');
+    }
+    return parts.length > 0 ? parts.join(', ') : '';
+  }
+
+  function updateStats() {
+    for (const pid of Object.keys(state.playerStats)) {
+      const s = state.playerStats[pid];
+      const prefix = pid === state.players[0]?.id ? 'p1' : 'p2';
+      const movesEl = els[`${prefix}_moves`];
+      const avgTimeEl = els[`${prefix}_avg_time`];
+      const tokensEl = els[`${prefix}_tokens`];
+      const avgTokEl = els[`${prefix}_avg_tokens`];
+      if (movesEl) movesEl.textContent = s.total_moves;
+      if (avgTimeEl) avgTimeEl.textContent = s.total_moves > 0 ? s.avg_move_duration_seconds.toFixed(1) + 's' : '--';
+      if (tokensEl) tokensEl.textContent = s.total_tokens;
+      if (avgTokEl) avgTokEl.textContent = s.total_moves > 0 ? s.avg_tokens_per_move.toFixed(0) : '--';
     }
   }
 
@@ -358,6 +387,20 @@ function updateBoard() {
         state.lastMovePlayer = event.player;
         state.lastPlayedCard = event.move ? event.move.card : null;
 
+        if (event.move_duration_seconds != null || event.prompt_tokens != null) {
+          if (!state.playerStats[event.player]) {
+            state.playerStats[event.player] = { total_moves: 0, total_duration_seconds: 0, total_prompt_tokens: 0, total_completion_tokens: 0, total_tokens: 0, avg_move_duration_seconds: 0, avg_tokens_per_move: 0 };
+          }
+          const ps = state.playerStats[event.player];
+          ps.total_moves += 1;
+          ps.total_duration_seconds += event.move_duration_seconds || 0;
+          ps.total_prompt_tokens += event.prompt_tokens || 0;
+          ps.total_completion_tokens += event.completion_tokens || 0;
+          ps.total_tokens = ps.total_prompt_tokens + ps.total_completion_tokens;
+          ps.avg_move_duration_seconds = ps.total_moves > 0 ? ps.total_duration_seconds / ps.total_moves : 0;
+          ps.avg_tokens_per_move = ps.total_moves > 0 ? ps.total_tokens / ps.total_moves : 0;
+        }
+
         if (event.snapshot) {
           applySnapshot(event.snapshot);
         }
@@ -365,15 +408,18 @@ function updateBoard() {
         const playerClass = getPlayerClass(event.player);
         const moveText = `<span class="log-turn">T${event.turn}</span> <span class="log-player ${playerClass}">${event.player}</span> <span class="log-action">${formatMove(event.move)}</span>`;
 
+        const kpiText = formatKpi(event);
+
         if (event.llm_response) {
           const entryId = `reason-T${event.turn}-${event.player}`;
-          addLogEntry(`${moveText} <button class="reason-toggle" data-target="${entryId}">&#9654;</button><div id="${entryId}" class="reason-content hidden">${escapeHtml(event.llm_response)}</div>`, '');
+          addLogEntry(`${moveText}${kpiText ? '<span class="log-kpi">' + kpiText + '</span>' : ''} <button class="reason-toggle" data-target="${entryId}">&#9654;</button><div id="${entryId}" class="reason-content hidden">${escapeHtml(event.llm_response)}</div>`, '');
         } else {
-          addLogEntry(moveText, '');
+          addLogEntry(`${moveText}${kpiText ? '<span class="log-kpi">' + kpiText + '</span>' : ''}`, '');
         }
 
         updateBoard();
         updatePanels();
+        updateStats();
         updateTurnIndicator();
         break;
       }
@@ -485,6 +531,7 @@ function updateBoard() {
     state.lastMovePlayer = null;
     state.seqPositions = new Set();
     state.gameActive = true;
+    state.playerStats = {};
 
     for (const p of state.players) {
       state.hands[p.id] = [];
@@ -493,6 +540,17 @@ function updateBoard() {
 
     els.log_entries.innerHTML = '';
     els.log_status.textContent = '';
+
+    for (const prefix of ['p1', 'p2']) {
+      const movesEl = els[`${prefix}_moves`];
+      const avgTimeEl = els[`${prefix}_avg_time`];
+      const tokensEl = els[`${prefix}_tokens`];
+      const avgTokEl = els[`${prefix}_avg_tokens`];
+      if (movesEl) movesEl.textContent = '0';
+      if (avgTimeEl) avgTimeEl.textContent = '--';
+      if (tokensEl) tokensEl.textContent = '0';
+      if (avgTokEl) avgTokEl.textContent = '--';
+    }
 
     document.querySelectorAll('.player-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.cell').forEach(c => {
@@ -684,10 +742,22 @@ function updateBoard() {
           const statusClass = game.winner ? 'won' : 'draw';
           const statusText = game.winner ? `${game.winner} Won` : 'Draw';
 
+          let statsHtml = '';
+          if (game.player_stats) {
+            const statsLines = [];
+            for (const [pid, ps] of Object.entries(game.player_stats)) {
+              statsLines.push(`${pid}: ${ps.avg_move_duration_seconds}s/move, ${ps.total_tokens}tok, ${ps.avg_tokens_per_move}tok/move`);
+            }
+            if (statsLines.length) {
+              statsHtml = `<div class="past-game-stats">${statsLines.join(' | ')}</div>`;
+            }
+          }
+
           item.innerHTML = `
             <div class="past-game-info">
               <div class="past-game-players">${playersStr}</div>
               <div class="past-game-meta">${game.created_at ? new Date(game.created_at).toLocaleString() : ''} &middot; ${game.event_count || 0} events</div>
+              ${statsHtml}
             </div>
             <div class="past-game-status ${statusClass}">${statusText}</div>
           `;

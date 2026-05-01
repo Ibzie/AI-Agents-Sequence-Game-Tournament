@@ -1,5 +1,7 @@
 import os
-from .base import BaseProvider
+import time
+
+from .base import BaseProvider, CompletionResult
 
 
 class OpenAIProvider(BaseProvider):
@@ -17,7 +19,7 @@ class OpenAIProvider(BaseProvider):
         model: str = "gpt-4o",
         temperature: float = 0.7,
         max_tokens: int = 512,
-    ) -> str:
+    ) -> CompletionResult:
         import openai
 
         kwargs = {
@@ -31,5 +33,20 @@ class OpenAIProvider(BaseProvider):
         else:
             client = openai.OpenAI(api_key=self.api_key)
 
+        start = time.perf_counter()
         response = client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content
+        elapsed = time.perf_counter() - start
+
+        content = response.choices[0].message.content
+        prompt_tokens = None
+        completion_tokens = None
+        if response.usage:
+            prompt_tokens = response.usage.prompt_tokens
+            completion_tokens = response.usage.completion_tokens
+
+        return CompletionResult(
+            content=content,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_seconds=elapsed,
+        )

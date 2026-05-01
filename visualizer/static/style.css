@@ -243,6 +243,34 @@ body {
   color: var(--text-secondary);
 }
 
+.player-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.72rem;
+}
+
+.stat-label {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.stat-value {
+  font-weight: 700;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.72rem;
+  color: var(--text-primary);
+}
+
 .hand-label {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -602,6 +630,13 @@ body {
   color: var(--text-primary);
 }
 
+.log-kpi {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  margin-left: 8px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
 .reason-toggle {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
@@ -795,6 +830,13 @@ body {
 .past-game-meta {
   font-size: 0.72rem;
   color: var(--text-secondary);
+}
+
+.past-game-stats {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  margin-top: 2px;
 }
 
 .past-game-status {

@@ -1,6 +1,8 @@
 import logging
+import time
+
 import httpx
-from .base import BaseProvider
+from .base import BaseProvider, CompletionResult
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,7 @@ class OllamaProvider(BaseProvider):
         model: str = "llama3",
         temperature: float = 0.3,
         max_tokens: int = 1024,
-    ) -> str:
+    ) -> CompletionResult:
         self.last_thinking = None
 
         payload = {
@@ -38,15 +40,21 @@ class OllamaProvider(BaseProvider):
         if self._is_thinking_model(model):
             payload["think"] = True
 
+        start = time.perf_counter()
         response = httpx.post(
             f"{self.host}/api/chat",
             json=payload,
             timeout=180.0,
         )
         response.raise_for_status()
+        elapsed = time.perf_counter() - start
+
         data = response.json()
         content = data["message"]["content"]
         thinking = data["message"].get("thinking", "")
+
+        prompt_tokens = data.get("prompt_eval_count")
+        completion_tokens = data.get("eval_count")
 
         if thinking and thinking.strip():
             self.last_thinking = thinking
@@ -62,4 +70,9 @@ class OllamaProvider(BaseProvider):
                 else:
                     content = thinking
 
-        return content
+        return CompletionResult(
+            content=content,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            duration_seconds=elapsed,
+        )
