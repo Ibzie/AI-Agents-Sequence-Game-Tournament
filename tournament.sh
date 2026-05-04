@@ -16,13 +16,13 @@ set -euo pipefail
 
 # Number of full round-robin iterations to run.
 # Each iteration: every contestant plays every other contestant once.
-TOURNAMENT_ITERATIONS=1
+TOURNAMENT_ITERATIONS=2
 
-# Games per head-to-head matchup. Use an even number for balanced P1/P2 starts.
-GAMES_PER_MATCH=6
+# Games per head-to-head matchup (Best-of-3).
+GAMES_PER_MATCH=3
 
 # Maximum games running in parallel.
-MAX_CONCURRENT=3
+MAX_CONCURRENT=1
 
 # Maximum turns before a game is declared a draw.
 MAX_TURNS=500
@@ -40,10 +40,10 @@ PYTHON_CMD=""
 # Contestants — format: "provider:model"
 # Supported providers: ollama | openai | anthropic
 CONTESTANTS=(
-    "anthropic:claude-haiku-4-5-20251001"
-    "anthropic:claude-sonnet-4-6"
-    "openai:gpt-4o"
-    # "ollama:llama3"
+    "ollama:granite4:3b"
+    "ollama:ministral-3:3b"
+    "ollama:qwen3.5:4b"
+    "ollama:gemma4:e4b"
 )
 
 # Root output directory; a timestamped subfolder is created per run.
@@ -326,7 +326,7 @@ for (( iter=1; iter<=TOURNAMENT_ITERATIONS; iter++ )); do
             log "Match: ${a#*:}  vs  ${b#*:}  (${GAMES_PER_MATCH} games)"
 
             for (( g=1; g<=GAMES_PER_MATCH; g++ )); do
-                (( game_n++ ))
+                (( game_n++ )) || true
 
                 # Alternate who has first-move advantage
                 if (( g % 2 == 1 )); then p1="$a"; p2="$b"
