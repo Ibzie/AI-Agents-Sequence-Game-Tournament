@@ -1,0 +1,7 @@
+model,wins,losses,draws,total,win_pct
+ollama:granite4:3b,36,9,0,45,80
+ollama:ministral-3:3b,24,21,0,45,53
+ollama:qwen3.5:4b,15,30,0,45,33
+ollama:gemma4:e4b,24,21,0,45,53
+ollama:phi4-mini:3.8b,27,18,0,45,60
+ollama:llama3.2:3b,9,36,0,45,20

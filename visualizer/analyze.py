@@ -37,10 +37,12 @@ C_PURPLE  = "#9B59B6"
 C_TEAL    = "#1ABC9C"
 
 MODEL_COLOURS = {
-    "granite4:3b":   C_TEAL,
+    "granite4:3b":    C_TEAL,
     "ministral-3:3b": C_AMBER,
-    "qwen3.5:4b":    C_BLUE,
-    "gemma4:e4b":    C_PURPLE,
+    "qwen3.5:4b":     C_BLUE,
+    "gemma4:e4b":     C_PURPLE,
+    "phi4-mini:3.8b": C_GREEN,
+    "llama3.2:3b":    C_RED,
 }
 
 plt.rcParams.update({
@@ -471,31 +473,23 @@ def chart_fallback(stats):
     labels  = [m.split(":")[0] for m in models]
     colours = [MODEL_COLOURS[m] for m in models]
 
-    fb_rates  = [np.mean(stats[m]["fallbacks"]) * 100 for m in models]
-    retry_avg = [np.mean(stats[m]["retries"]) for m in models]
+    retry_avg = [np.mean(stats[m]["retries"]) if stats[m]["retries"] else 0.0 for m in models]
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    fig, ax = plt.subplots(figsize=(8, 4.5), facecolor=DARK_BG)
+    fig.subplots_adjust(top=0.82, bottom=0.15, left=0.12, right=0.97)
 
-    ax = axes[0]
-    bars = ax.bar(labels, fb_rates, color=colours, width=0.55, edgecolor="white", linewidth=0.8)
-    for bar, r in zip(bars, fb_rates):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.4,
-                f"{r:.1f}%", ha="center", va="bottom", fontsize=11,
+    ax.set_facecolor(PANEL_BG)
+    bars = ax.bar(labels, retry_avg, color=colours, width=0.55, edgecolor="white", linewidth=0.8)
+    r_max = max(retry_avg) if max(retry_avg) > 0 else 1
+    ax.set_ylim(0, r_max * 1.5 + 0.1)
+    for bar, r in zip(bars, retry_avg):
+        ax.text(bar.get_x() + bar.get_width() / 2, max(bar.get_height(), 0) + r_max * 0.04,
+                f"{r:.3f}", ha="center", va="bottom", fontsize=11,
                 fontweight="bold", color="white")
-    ax.set_ylabel("% of moves needing fallback", fontsize=10)
-    ax.set_title("Response Fallback Rate\n(model output required regex/number extraction)", fontsize=10, fontweight="bold")
+    ax.set_ylabel("Avg retries per move", fontsize=10)
+    ax.set_title("Average Retry Attempts per Move\n(max 3 attempts; lower = cleaner output)", fontsize=11, fontweight="bold")
 
-    ax2 = axes[1]
-    bars2 = ax2.bar(labels, retry_avg, color=colours, width=0.55, edgecolor="white", linewidth=0.8)
-    for bar, r in zip(bars2, retry_avg):
-        ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.005,
-                 f"{r:.3f}", ha="center", va="bottom", fontsize=11,
-                 fontweight="bold", color="white")
-    ax2.set_ylabel("Avg retries per move", fontsize=10)
-    ax2.set_title("Average Retry Attempts per Move\n(max 3 attempts per move)", fontsize=10, fontweight="bold")
-
-    fig.suptitle("Model Response Reliability", fontsize=13, fontweight="bold")
-    plt.tight_layout()
+    fig.suptitle("Model Response Reliability", fontsize=13, fontweight="bold", y=0.97)
     save(fig, "06_fallback_reliability.png")
 
 
@@ -900,6 +894,95 @@ def chart_token_deep_dive(json_games):
     save(fig, "14_token_deep_dive.png")
 
 
+def chart_per_iteration(games):
+    iters = {}
+    for g in games:
+        m = re.match(r"iter(\d+)_", g["file"])
+        if m:
+            iters.setdefault(int(m.group(1)), []).append(g)
+    if len(iters) < 2:
+        return
+
+    models  = sorted(MODEL_COLOURS, key=lambda m: -sum(
+        1 for g in games if g["winner_model"] == m
+    ))
+    n_iters = len(iters)
+    x       = np.arange(len(models))
+    width   = 0.8 / n_iters
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5), facecolor=DARK_BG)
+
+    # ── left: grouped win% bars per iteration
+    ax = axes[0]
+    ax.set_facecolor(PANEL_BG)
+    for i, it in enumerate(sorted(iters)):
+        ig = iters[it]
+        iw = Counter(g["winner_model"] for g in ig if g["winner_id"] not in (None, "draw"))
+        it_total = Counter()
+        for g in ig:
+            it_total[g["p1_model"]] += 1
+            it_total[g["p2_model"]] += 1
+        win_pcts = [iw.get(m, 0) / max(it_total[m], 1) * 100 for m in models]
+        offset   = (i - (n_iters - 1) / 2) * width
+        bars = ax.bar(x + offset, win_pcts, width=width * 0.9,
+                      label=f"Iter {it}", alpha=0.85, edgecolor="white", linewidth=0.5)
+        for bar, pct in zip(bars, win_pcts):
+            if pct > 5:
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.8,
+                        f"{pct:.0f}%", ha="center", va="bottom", fontsize=7, color="white")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([m.split(":")[0] for m in models], fontsize=9)
+    ax.set_ylabel("Win %")
+    ax.set_ylim(0, 105)
+    ax.set_title("Win % per Iteration", fontsize=11, fontweight="bold")
+    ax.legend(fontsize=9)
+    ax.axhline(50, color=C_GREY, linestyle="--", linewidth=0.8, alpha=0.6)
+
+    # ── right: win% line chart across iterations per model
+    ax2 = axes[1]
+    ax2.set_facecolor(PANEL_BG)
+    it_nums = sorted(iters)
+    end_labels = []  # (y_value, label, color) — sorted after to avoid overlaps
+    for mdl in models:
+        col = MODEL_COLOURS.get(mdl, C_GREY)
+        pcts = []
+        for it in it_nums:
+            ig = iters[it]
+            iw = Counter(g["winner_model"] for g in ig if g["winner_id"] not in (None, "draw"))
+            it_total = Counter()
+            for g in ig:
+                it_total[g["p1_model"]] += 1
+                it_total[g["p2_model"]] += 1
+            n = it_total[mdl]
+            pcts.append(iw.get(mdl, 0) / max(n, 1) * 100)
+        ax2.plot(it_nums, pcts, marker="o", color=col, linewidth=2, label=mdl.split(":")[0])
+        end_labels.append((pcts[-1], mdl.split(":")[0], col))
+
+    # Spread overlapping end labels — nudge by min 5% spacing
+    end_labels.sort(key=lambda t: t[0])
+    placed = []
+    for y, lbl, col in end_labels:
+        y_adj = y
+        for py in placed:
+            if abs(y_adj - py) < 5:
+                y_adj = py + 5
+        placed.append(y_adj)
+        ax2.text(it_nums[-1] + 0.08, y_adj, lbl, fontsize=8, color=col, va="center")
+
+    ax2.set_xticks(it_nums)
+    ax2.set_xlabel("Iteration")
+    ax2.set_ylabel("Win %")
+    ax2.set_ylim(0, 105)
+    ax2.set_xlim(it_nums[0] - 0.3, it_nums[-1] + 1.2)
+    ax2.set_title("Win % Trend Across Iterations", fontsize=11, fontweight="bold")
+    ax2.axhline(50, color=C_GREY, linestyle="--", linewidth=0.8, alpha=0.6)
+
+    fig.suptitle("Per-Iteration Tournament Results", fontsize=13, fontweight="bold")
+    fig.tight_layout()
+    save(fig, "15_per_iteration.png")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # TEXT REPORT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -944,6 +1027,32 @@ def print_report(games, stats):
     print(f"  mean={np.mean(lengths):.1f}  median={np.median(lengths):.0f}  "
           f"min={min(lengths)}  max={max(lengths)}")
 
+    # ── Per-iteration standings
+    iters = {}
+    for g in games:
+        m = re.match(r"iter(\d+)_", g["file"])
+        if m:
+            iters.setdefault(int(m.group(1)), []).append(g)
+
+    if len(iters) > 1:
+        print("\n── PER-ITERATION STANDINGS ────────────────────────────────────────")
+        for it in sorted(iters):
+            ig = iters[it]
+            iw = Counter(g["winner_model"] for g in ig if g["winner_id"] not in (None, "draw"))
+            it_total = Counter()
+            for g in ig:
+                it_total[g["p1_model"]] += 1
+                it_total[g["p2_model"]] += 1
+            print(f"\n  Iteration {it}  ({len(ig)} games)")
+            print(f"  {'Model':<22}  {'W':>4}  {'L':>4}  {'Win%':>6}")
+            print("  " + "-"*42)
+            for m in sorted(MODEL_COLOURS, key=lambda m: -iw.get(m, 0)):
+                n = it_total[m]
+                if n == 0:
+                    continue
+                w = iw.get(m, 0)
+                print(f"  {m:<22}  {w:>4}  {n-w:>4}  {w/n*100:>5.0f}%")
+
     print(f"\n{sep}\n")
 
 
@@ -972,6 +1081,7 @@ def main():
     chart_seq_speed(games)
     chart_jack_breakdown(stats)
     chart_token_deep_dive(json_games)
+    chart_per_iteration(games)
 
     print_report(games, stats)
     print(f"All output saved to: {OUTPUT_DIR}\n")

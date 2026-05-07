@@ -16,13 +16,13 @@ set -euo pipefail
 
 # Number of full round-robin iterations to run.
 # Each iteration: every contestant plays every other contestant once.
-TOURNAMENT_ITERATIONS=2
+TOURNAMENT_ITERATIONS=3
 
 # Games per head-to-head matchup (Best-of-3).
 GAMES_PER_MATCH=3
 
 # Maximum games running in parallel.
-MAX_CONCURRENT=1
+MAX_CONCURRENT=2
 
 # Maximum turns before a game is declared a draw.
 MAX_TURNS=500
@@ -44,6 +44,8 @@ CONTESTANTS=(
     "ollama:ministral-3:3b"
     "ollama:qwen3.5:4b"
     "ollama:gemma4:e4b"
+    "ollama:phi4-mini:3.8b"
+    "ollama:llama3.2:3b"
 )
 
 # Root output directory; a timestamped subfolder is created per run.
@@ -355,4 +357,8 @@ save_csv
 
 echo ""
 log "Full logs: $LOG_DIR"
+echo ""
+hr
+echo "  TOURNAMENT COMPLETE"
+hr
 echo ""

@@ -44,13 +44,6 @@ def parse_move_index(response: str, legal_moves: list) -> dict | None:
         except (ValueError, IndexError):
             pass
 
-    numbers = re.findall(r'\b(\d+)\b', text)
-    for num_str in numbers:
-        idx = int(num_str)
-        if 0 <= idx < len(legal_moves):
-            logger.info(f"Recovered move_index {idx} from fallback number extraction")
-            return legal_moves[idx]
-
     logger.warning(f"Could not parse any move index from response: {text[:200]}")
     return None
 
