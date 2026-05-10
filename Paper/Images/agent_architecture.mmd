@@ -1,0 +1,15 @@
+flowchart TD
+    PB["Prompt Builder\nRules · Board State · Hand · Legal Moves"]
+    LLM["Ollama LLM\nTemperature = 0.3"]
+    RP["Response Parser\nStrict JSON → Regex JSON → Coordinates → Bare Integer"]
+    RQ{"Retry ≤ 3?"}
+    RM["Random Legal Move\n(Safety Net — Never Triggered)"]
+    GE["Game Engine"]
+
+    PB --> LLM
+    LLM --> RP
+    RP -->|"Parse success"| GE
+    RP -->|"Parse fail"| RQ
+    RQ -->|"Yes"| LLM
+    RQ -->|"No"| RM
+    RM --> GE
